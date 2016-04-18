@@ -7,16 +7,14 @@ extern crate rustc_serialize;
 use std::env;
 use std::ffi::CString;
 use std::fmt::Display;
-use std::fs::{File,remove_file};
 use std::panic::PanicInfo;
-use std::path::Path;
 
 use rustc_serialize::{Encodable, json};
 use backtrace::Symbol;
 
 mod bindings;
 #[allow(dead_code)]
-mod download;
+mod agent;
 
 /// Starts appsignal agent and extension. AppSignal needs to be configured
 /// through environment variables:
@@ -33,7 +31,7 @@ mod download;
 /// * `APPSIGNAL_WORKING_DIR_PATH`: Optional, set a specific path to store appsignal tmp files
 pub fn start() {
     // Set agent version
-    env::set_var("APPSIGNAL_AGENT_VERSION", download::AGENT_VERSION);
+    env::set_var("APPSIGNAL_AGENT_VERSION", agent::AGENT_VERSION);
 
     // Set default config if not already present
     match env::var("APPSIGNAL_PUSH_API_ENDPOINT") {
@@ -46,33 +44,6 @@ pub fn start() {
     };
     match env::var("APPSIGNAL_APP_PATH") {
         Err(_) => env::set_var("APPSIGNAL_APP_PATH", env::var("PWD").unwrap()),
-        _ => ()
-    };
-    match env::var("APPSIGNAL_AGENT_PATH") {
-        Err(_) => {
-            // TODO Use appsignal working dir for this instead of PWD
-            let pwd = env::var("PWD").unwrap();
-            {
-                let pwd_path = Path::new(&pwd);
-                // No agent path set, so check if the agent is in the working dir and
-                // download it otherwise.
-                match File::open("appsignal-agent") {
-                    Err(_) => {
-                        // Download and extract agent archive
-                        download::download_agent_archive("x86_64-linux", &pwd_path);
-
-                        // Clean up
-                        remove_file("appsignal-agent-x86_64-linux-static.tar.gz").unwrap();
-                        remove_file("appsignal_extension.h").unwrap();
-                        remove_file("libappsignal.a").unwrap();
-                    },
-                    Ok(_) => ()
-                };
-            }
-
-            // Set agent path to working directory
-            env::set_var("APPSIGNAL_AGENT_PATH", pwd);
-        },
         _ => ()
     };
 
