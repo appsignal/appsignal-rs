@@ -1,0 +1,10 @@
+[package]
+name = "appsignal"
+version = "0.1.0"
+authors = ["Thijs Cadier <thijs@appsignal.com>"]
+build   = "build.rs"
+
+[dependencies]
+backtrace       = "*"
+libc            = "*"
+rustc-serialize = "*"
