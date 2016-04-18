@@ -7,21 +7,22 @@ extern crate rustc_serialize;
 use std::env;
 use std::ffi::CString;
 use std::fmt::Display;
+use std::fs::{File,remove_file};
 use std::panic::PanicInfo;
+use std::path::Path;
 
 use rustc_serialize::{Encodable, json};
 use backtrace::Symbol;
 
 mod bindings;
-
-static AGENT_VERSION: &'static str = "4201306"; // Also present in build.rs
+#[allow(dead_code)]
+mod download;
 
 /// Starts appsignal agent and extension. AppSignal needs to be configured
 /// through environment variables:
 ///
 /// * `APPSIGNAL_ACTIVE`: extension starts if value is true
-/// * `APPSIGNAL_AGENT_PATH`: Path to directory of agent executable
-/// * `APPSIGNAL_APP_PATH`: path to the app we're monitoring
+/// * `APPSIGNAL_APP_PATH`: path to the app we're monitoring, defaults to working directory
 /// * `APPSIGNAL_LOG_PATH`: Path to write logs to
 /// * `APPSIGNAL_PUSH_API_ENDPOINT`: Endpoint to post data to (https://push.appsignal.com)
 /// * `APPSIGNAL_PUSH_API_KEY`: Key you get in the installation wizard on https://appsignal.com
@@ -30,14 +31,9 @@ static AGENT_VERSION: &'static str = "4201306"; // Also present in build.rs
 /// * `APPSIGNAL_AGENT_VERSION`: Version of the agent we're running
 /// * `APPSIGNAL_TRANSMISSION_INTERVAL`: Optional, amount of time between transmissions. Default is 30
 /// * `APPSIGNAL_WORKING_DIR_PATH`: Optional, set a specific path to store appsignal tmp files
-///
-/// To run AppSignal the extension needs to be able to start the agent. You can find this
-/// executable in `target/debug,release/appsignal/out. When deploying the Rust binary you also
-/// need to deploy this file and configure it's path in `APPSIGNAL_AGENT_PATH`.
-///
 pub fn start() {
     // Set agent version
-    env::set_var("APPSIGNAL_AGENT_VERSION", AGENT_VERSION);
+    env::set_var("APPSIGNAL_AGENT_VERSION", download::AGENT_VERSION);
 
     // Set default config if not already present
     match env::var("APPSIGNAL_PUSH_API_ENDPOINT") {
@@ -50,6 +46,33 @@ pub fn start() {
     };
     match env::var("APPSIGNAL_APP_PATH") {
         Err(_) => env::set_var("APPSIGNAL_APP_PATH", env::var("PWD").unwrap()),
+        _ => ()
+    };
+    match env::var("APPSIGNAL_AGENT_PATH") {
+        Err(_) => {
+            // TODO Use appsignal working dir for this instead of PWD
+            let pwd = env::var("PWD").unwrap();
+            {
+                let pwd_path = Path::new(&pwd);
+                // No agent path set, so check if the agent is in the working dir and
+                // download it otherwise.
+                match File::open("appsignal-agent") {
+                    Err(_) => {
+                        // Download and extract agent archive
+                        download::download_agent_archive("x86_64-linux", &pwd_path);
+
+                        // Clean up
+                        remove_file("appsignal-agent-x86_64-linux-static.tar.gz").unwrap();
+                        remove_file("appsignal_extension.h").unwrap();
+                        remove_file("libappsignal.a").unwrap();
+                    },
+                    Ok(_) => ()
+                };
+            }
+
+            // Set agent path to working directory
+            env::set_var("APPSIGNAL_AGENT_PATH", pwd);
+        },
         _ => ()
     };
 
