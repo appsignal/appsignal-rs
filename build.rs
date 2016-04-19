@@ -21,7 +21,7 @@ fn main() {
 
     // Download and extract agent
     let archive_name = format!(
-        "appsignal-agent-{}-static.tar.gz",
+        "appsignal-{}-extension-static.tar.gz",
         architecture
     );
     let url = format!(
@@ -29,6 +29,9 @@ fn main() {
         agent::AGENT_VERSION,
         archive_name
     );
+
+    println!("Downloading archive from {}", url);
+
     Command::new("curl").arg("-O") // Save to disk
                          .arg("-L") // Follow redirects
                          .current_dir(out_path)
