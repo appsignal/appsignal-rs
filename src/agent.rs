@@ -1,1 +1,1 @@
-pub static AGENT_VERSION: &'static str = "5226493";
+pub static AGENT_VERSION: &'static str = "4e5c938b";
